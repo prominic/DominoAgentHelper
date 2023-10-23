@@ -1,5 +1,3 @@
-import lotus.domino.Session;
-
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -14,16 +12,12 @@ import lotus.domino.Base;
 import lotus.domino.Database;
 import lotus.domino.View;
 import lotus.domino.Document;
-import lotus.domino.Name;
 import lotus.domino.NotesException;
-import lotus.domino.NotesFactory;
-import lotus.notes.addins.JavaServerAddin;
-import lotus.notes.internal.MessageQueue;
 import net.prominic.gja_v084.JavaServerAddinGenesis;
 
 public class AgentsHelper extends JavaServerAddinGenesis {
 	private String m_filePath = "agentshelper.nsf";
-	private List<HashMap<String, Object>> m_events = null;
+	EventCommands m_event = null;
 	
 	public AgentsHelper(String[] args) {
 		super();
@@ -51,8 +45,11 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 				logSevere("(!) LOAD FAILED - database not found: " + m_filePath);
 				return false;
 			}
-
-			updateCommands();
+			
+			m_event = new EventCommands("Commands", 1, true, this.m_logger);
+			m_event.session = this.m_session;
+			m_event.events = getCommands();
+			eventsAdd(m_event);
 		} catch (Exception e) {
 			logSevere(e);
 			return false;
@@ -62,21 +59,38 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 	
 	@Override
 	protected void runNotesBeforeListen() {
-		EventCommands eventCommands = new EventCommands("Commands", 1, true, this.m_logger);
-		eventCommands.session = this.m_session;
-		eventCommands.events = this.m_events;
-		eventsAdd(eventCommands);
+		m_event.triggerOnStart();
 	}
 	
-	private void updateCommands() {
+	protected boolean resolveMessageQueueState(String cmd) {
+		boolean flag = super.resolveMessageQueueState(cmd);
+		if (flag)
+			return true;
+
+		if (cmd.startsWith("update")) {
+			m_event.events = getCommands();
+			logMessage("update - completed");
+		} else if (cmd.startsWith("trigger")) {
+			m_event.triggerFireForce();
+			logMessage("trigger - completed");
+		} else {
+			logMessage("invalid command (use -h or help to get details)");
+		}
+
+		return true;
+	}
+	
+	private List<HashMap<String, Object>> getCommands() {
+		List<HashMap<String, Object>> list = null;
+		
 		try {
 			Database database = m_session.getDatabase(null, m_filePath);
 			if (database == null || !database.isOpen()) {
 				logMessage("(!) LOAD FAILED - database not found: " + m_filePath);
-				return;
+				return null;
 			}
 
-			m_events = new ArrayList<HashMap<String, Object>>();
+			list = new ArrayList<HashMap<String, Object>>();
 
 			View view = database.getView("Commands");
 			Document doc = view.getFirstDocument();
@@ -92,16 +106,19 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 					String command = (String) obj.get("command");	// required
 					Long interval = (Long) obj.get("interval");		// required
 					boolean runOnStart = obj.containsKey("runOnStart") && (Boolean) obj.get("runOnStart");	// optional
-					String runIf = (String) obj.get("runIf");		// optional
-
+					String runIfFormula = (String) obj.get("runIfFormula");		// optional
+					String runIfDatabase = (String) obj.get("runIfDatabase");	// optional
+					
 					HashMap<String, Object> event = new HashMap<String, Object>();
+					event.put("name", name);
 					event.put("command", command);
 					event.put("interval", interval);
 					event.put("runOnStart", runOnStart);
-					event.put("runIf", runIf);
+					event.put("runIfFormula", runIfFormula);
+					event.put("runIfDatabase", runIfDatabase);
 					event.put("lastRun", new Date());
 
-					m_events.add(event);
+					list.add(event);
 				}
 				else {
 					logMessage(name + ": invalid json");
@@ -116,6 +133,8 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		return list;
 	}
 
 	protected void showHelp() {
@@ -125,8 +144,8 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 		logMessage("   quit             Unload addin");
 		logMessage("   help             Show help information (or -h)");
 		logMessage("   info             Show version");
-		logMessage("   fire            	Fire all agents from config");
-		logMessage("   update           Update config from <agentshelper.nsf>");
+		logMessage("   trigger          Fire all agents from " + m_filePath);
+		logMessage("   update           Update config from " + m_filePath);
 
 		int year = Calendar.getInstance().get(Calendar.YEAR);
 		logMessage("Copyright (C) Prominic.NET, Inc. 2023" + (year > 2023 ? " - " + Integer.toString(year) : ""));
@@ -150,7 +169,7 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 	 */
 	protected void showInfoExt() {
 		logMessage("config       " + m_filePath);
-		logMessage("events       " + m_events.size());
+		logMessage("events       " + m_event.events.size());
 	}
 
 	/**
