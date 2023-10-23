@@ -30,12 +30,12 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 
 	@Override
 	protected String getJavaAddinVersion() {
-		return "1.0.2";
+		return "1.0.3";
 	}
 	
 	@Override
 	protected String getJavaAddinDate() {
-		return "2023-10-23 15:05";
+		return "2023-10-23 21:00";
 	}
 	
 	protected boolean runNotesAfterInitialize() {

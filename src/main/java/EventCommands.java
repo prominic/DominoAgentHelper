@@ -51,41 +51,35 @@ public class EventCommands extends Event {
 
 			long seconds = (now.getTime()-lastRun.getTime())/1000;
 			if (seconds > interval) {
-				System.out.println(event.get("name"));
-				boolean allow = true;
-				String runIfFormula = (String) event.get("runIfFormula");
-				String runIfDatabase = (String) event.get("runIfDatabase");
-				if (!runIfFormula.isEmpty() && !runIfDatabase.isEmpty()) {
-					try {
-						Database database = session.getDatabase(null, runIfDatabase);
-						Document doc = database.createDocument();
-						@SuppressWarnings("unchecked")
-						Vector<Double> res = session.evaluate(runIfFormula, doc);
-						allow = res.get(0) == 1;
-						doc.recycle();
-						database.recycle();
-					} catch (NotesException e) {
-						this.getLogger().severe(e);
-					}
-				}
-
-				if (allow) {
-					triggerEvent(event);	
-				}
-				else {
-					event.put("lastRun", new Date());	
-				}
+				triggerEvent(event);	
 			};
 		}
 	}
 
 	private void triggerEvent(HashMap<String, Object> event) {
+		boolean allow = true;
+
 		try {
-			String command = (String) event.get("command");
-			session.sendConsoleCommand("", command);
-			event.put("lastRun", new Date());
+			String runIfFormula = (String) event.get("runIfFormula");
+			String runIfDatabase = (String) event.get("runIfDatabase");
+			if (!runIfFormula.isEmpty() && !runIfDatabase.isEmpty()) {
+				Database database = session.getDatabase(null, runIfDatabase);
+				Document doc = database.createDocument();
+				@SuppressWarnings("unchecked")
+				Vector<Double> res = session.evaluate(runIfFormula, doc);
+				allow = res.get(0) == 1;
+				doc.recycle();
+				database.recycle();
+			}
+
+			if (allow) {
+				String command = (String) event.get("command");
+				session.sendConsoleCommand("", command);	
+			}
 		} catch (NotesException e) {
 			e.printStackTrace();
 		}
+
+		event.put("lastRun", new Date());
 	}
 }
