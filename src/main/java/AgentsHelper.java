@@ -17,7 +17,7 @@ import net.prominic.gja_v084.JavaServerAddinGenesis;
 
 public class AgentsHelper extends JavaServerAddinGenesis {
 	private String m_filePath = "agentshelper.nsf";
-	EventCommands m_event = null;
+	EventAgents m_event = null;
 	
 	public AgentsHelper(String[] args) {
 		super();
@@ -30,12 +30,12 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 
 	@Override
 	protected String getJavaAddinVersion() {
-		return "1.0.3";
+		return "1.0.5";
 	}
 	
 	@Override
 	protected String getJavaAddinDate() {
-		return "2023-10-23 21:00";
+		return "2023-10-28 15:30";
 	}
 	
 	protected boolean runNotesAfterInitialize() {
@@ -46,9 +46,9 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 				return false;
 			}
 			
-			m_event = new EventCommands("Commands", 1, true, this.m_logger);
+			m_event = new EventAgents("Agents", 1, true, this.m_logger);
 			m_event.session = this.m_session;
-			m_event.events = getCommands();
+			m_event.events = getAgents();
 			eventsAdd(m_event);
 		} catch (Exception e) {
 			logSevere(e);
@@ -59,7 +59,7 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 	
 	@Override
 	protected void runNotesBeforeListen() {
-		m_event.triggerOnStart();
+		m_event.triggerAgentOnStart();
 	}
 	
 	protected boolean resolveMessageQueueState(String cmd) {
@@ -68,7 +68,7 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 			return true;
 
 		if (cmd.startsWith("update")) {
-			m_event.events = getCommands();
+			m_event.events = getAgents();
 			logMessage("update - completed");
 		} else if (cmd.startsWith("trigger")) {
 			m_event.triggerFireForce();
@@ -80,7 +80,7 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 		return true;
 	}
 	
-	private List<HashMap<String, Object>> getCommands() {
+	private List<HashMap<String, Object>> getAgents() {
 		List<HashMap<String, Object>> list = null;
 		
 		try {
@@ -92,36 +92,40 @@ public class AgentsHelper extends JavaServerAddinGenesis {
 
 			list = new ArrayList<HashMap<String, Object>>();
 
-			View view = database.getView("Commands");
+			View view = database.getView("Agents");
 			Document doc = view.getFirstDocument();
 			while (doc != null) {
 				Document docNext = view.getNextDocument(doc);
 
 				// start new thread for each agent
-				String name = doc.getItemValueString("Name");
+				String title = doc.getItemValueString("Title");
 				String json = doc.getItemValueString("JSON");
 
 				JSONObject obj = getJSONObject(json);
 				if (obj != null) {
-					String command = (String) obj.get("command");	// required
+					String server = (String) obj.get("server");		// required
+					String filePath = (String) obj.get("database");	// required
+					String agent = (String) obj.get("agent");		// required
+					String viewName = (String) obj.get("view");		// required
 					Long interval = (Long) obj.get("interval");		// required
+					Long delay = (Long) obj.get("delay");			// required
 					boolean runOnStart = obj.containsKey("runOnStart") && (Boolean) obj.get("runOnStart");	// optional
-					String runIfFormula = (String) obj.get("runIfFormula");		// optional
-					String runIfDatabase = (String) obj.get("runIfDatabase");	// optional
 					
 					HashMap<String, Object> event = new HashMap<String, Object>();
-					event.put("name", name);
-					event.put("command", command);
+					event.put("title", title);
+					event.put("server", server);
+					event.put("filePath", filePath);
+					event.put("agent", agent);
+					event.put("view", viewName);
 					event.put("interval", interval);
+					event.put("delay", delay);
 					event.put("runOnStart", runOnStart);
-					event.put("runIfFormula", runIfFormula);
-					event.put("runIfDatabase", runIfDatabase);
 					event.put("lastRun", new Date());
 
 					list.add(event);
 				}
 				else {
-					logMessage(name + ": invalid json");
+					logMessage(title + ": invalid json");
 				}
 
 				recycle(doc);
