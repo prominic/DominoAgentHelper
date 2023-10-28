@@ -5,7 +5,7 @@
 	<groupId>net.prominic</groupId>
 	<artifactId>AgentsHelper</artifactId>
 	<packaging>jar</packaging>
-	<version>1.0.3</version>
+	<version>1.0.5</version>
 	<name>AgentsHelper</name>
 	<url>http://maven.apache.org</url>
 
