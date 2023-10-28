@@ -78,6 +78,7 @@ public class EventAgents extends Event {
 					System.err.print(err);
 				}
 				else {
+					view.refresh();
 					allow = view.getAllEntries().getCount() > 0;
 					view.recycle();
 				}
